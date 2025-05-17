@@ -6,17 +6,21 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext"; // Adjust the import if needed
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function Navbar() {
+type NavbarProps = {
+  background?: string;
+};
+
+export default function Navbar({ background }: NavbarProps) {
   const { user } = useAuth();
 
   return (
     <AppBar
-      position="sticky"
+      position="fixed"
       elevation={0}
       sx={{
-        background: "rgba(255,255,255,0.8)",
+        background: background || "rgb(0, 0, 0)",
         backdropFilter: "blur(16px)",
         borderBottom: "1px solid rgba(0,0,0,0.07)",
       }}
@@ -26,7 +30,7 @@ export default function Navbar() {
           <Typography
             variant="h6"
             fontWeight="bold"
-            color="text.primary"
+            color="inherit"
             sx={{ letterSpacing: 2 }}
           >
             Dashboard

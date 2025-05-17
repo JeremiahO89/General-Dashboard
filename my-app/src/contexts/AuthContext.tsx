@@ -24,9 +24,9 @@ type RegisterData = {
 type AuthContextType = {
   user: UserInfo | null;
   login: (username: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<boolean>;  // Added
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
-  error: string | null;                                // Added
+  error: string | null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,13 +70,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(userRes.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Login failed.");
+      throw err; // rethrow so caller knows login failed
     }
   };
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setError(null);
     try {
-      await api.post("/auth/", data);
+      await api.post("/auth/register", data); // Assuming /auth/register endpoint
       return true;
     } catch (err: any) {
       setError(err.response?.data?.detail || "Registration failed.");
