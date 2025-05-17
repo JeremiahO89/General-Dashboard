@@ -8,8 +8,8 @@ import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
 import LoginForm from "@/components/login/LoginForm";
 import RegisterForm from "@/components/login/RegisterForm";
 import UserInfoDisplay from "@/components/login/UserInfoDisplay";
-import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
+
 
 export default function LoginPage() {
   const { user, login, register, logout } = useAuth();
@@ -58,72 +58,70 @@ export default function LoginPage() {
   };
 
   return (
-    <>
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
+    <Box
+      display="flex"
+      justifyContent="center"
+      alignItems="center"
+      minHeight="100vh"
+      sx={{
+        background: "linear-gradient(to top,rgb(0, 128, 255), #e0e7ff)",
+        p: 2,
+      }}
+    >
+      <Paper
+        elevation={6}
         sx={{
-          background: "linear-gradient(to top,rgb(0, 128, 255), #e0e7ff)",
-          p: 2,
+          p: 5,
+          width: 380,
+          borderRadius: 4,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          backgroundColor: "#fff",
         }}
       >
-        <Paper
-          elevation={6}
-          sx={{
-            p: 5,
-            width: 380,
-            borderRadius: 4,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            backgroundColor: "#fff",
-          }}
-        >
-          <Avatar sx={{ bgcolor: "primary.main", mb: 2 }}>
-            {user ? <LockOpenOutlinedIcon /> : <LockOutlinedIcon />}
-          </Avatar>
-          <Typography variant="h5" mb={1} fontWeight={600}>
-            {user ? `Welcome!` : tab === 0 ? "Login" : "Register"}
-          </Typography>
+        <Avatar sx={{ bgcolor: "primary.main", mb: 2 }}>
+          {user ? <LockOpenOutlinedIcon /> : <LockOutlinedIcon />}
+        </Avatar>
+        <Typography variant="h5" mb={1} fontWeight={600}>
+          {user ? `Welcome!` : tab === 0 ? "Login" : "Register"}
+        </Typography>
 
-          {user ? (
-            <UserInfoDisplay user={user} onLogout={logout} />
-          ) : (
-            <>
-              <Tabs value={tab} onChange={handleTabChange} centered sx={{ width: "100%", mb: 2 }}>
-                <Tab label="Login" />
-                <Tab label="Register" />
-              </Tabs>
+        {user ? (
+          <UserInfoDisplay user={user} onLogout={logout} />
+        ) : (
+          <>
+            <Tabs value={tab} onChange={handleTabChange} centered sx={{ width: "100%", mb: 2 }}>
+              <Tab label="Login" />
+              <Tab label="Register" />
+            </Tabs>
 
-              {tab === 0 ? (
-                <LoginForm
-                  username={username}
-                  password={password}
-                  setUsername={setUsername}
-                  setPassword={setPassword}
-                  onSubmit={handleLogin}
-                  error={localError}  // pass local error
-                />
-              ) : (
-                <RegisterForm
-                  firstName={firstName}
-                  lastName={lastName}
-                  username={username}
-                  password={password}
-                  setFirstName={setFirstName}
-                  setLastName={setLastName}
-                  setUsername={setUsername}
-                  setPassword={setPassword}
-                  onSubmit={handleRegister}
-                  error={localError}  // pass local error
-                />
-              )}
-            </>
-          )}
-        </Paper>
-      </Box>
-    </>
+            {tab === 0 ? (
+              <LoginForm
+                username={username}
+                password={password}
+                setUsername={setUsername}
+                setPassword={setPassword}
+                onSubmit={handleLogin}
+                error={localError}  // pass local error
+              />
+            ) : (
+              <RegisterForm
+                firstName={firstName}
+                lastName={lastName}
+                username={username}
+                password={password}
+                setFirstName={setFirstName}
+                setLastName={setLastName}
+                setUsername={setUsername}
+                setPassword={setPassword}
+                onSubmit={handleRegister}
+                error={localError}  // pass local error
+              />
+            )}
+          </>
+        )}
+      </Paper>
+    </Box>
   );
 }
