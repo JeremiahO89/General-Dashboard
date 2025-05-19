@@ -36,6 +36,9 @@ export default function Navbar() {
           <Button component={Link} href="/" color="inherit" sx={{ mx: 1 }}>
             Home
           </Button>
+          <Button component={Link} href="/budgeting" color="inherit" sx={{ mx: 1 }}>
+            Budget
+          </Button>
           <Button component={Link} href="/about" color="inherit" sx={{ mx: 1 }}>
             About
           </Button>
