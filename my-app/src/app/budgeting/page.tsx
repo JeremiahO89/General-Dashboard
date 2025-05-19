@@ -10,7 +10,6 @@ import {
   IconButton,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import api from "@/utils/api";
 
 type Expense = {
   id: number;
@@ -37,12 +36,18 @@ export default function BudgetPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await api.get<Expense[]>("/expenses", {
+      const res = await fetch("http://localhost:8000/expenses", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setExpenses(res.data);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} - ${await res.text()}`);
+      }
+
+      const data: Expense[] = await res.json();
+      setExpenses(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to fetch expenses");
+      setError(err.message || "Failed to fetch expenses");
     } finally {
       setLoading(false);
     }
@@ -63,17 +68,22 @@ export default function BudgetPage() {
           alert("Please enter a valid name and non-negative amount for each expense.");
           return;
         }
-        await api.post(
-          "/expenses",
-          { name: expense.name, amount: expense.amount },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+
+        await fetch("http://localhost:8000/expenses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name: expense.name, amount: expense.amount }),
+        });
       }
+
       alert("Expenses saved!");
       fetchExpenses(token);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to save expenses");
-      alert(err.response?.data?.detail || "Failed to save expenses");
+      setError(err.message || "Failed to save expenses");
+      alert(err.message || "Failed to save expenses");
     }
   };
 
