@@ -1,224 +1,221 @@
+// app/budget/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  Button,
-  IconButton,
+  Box, Typography, Paper, Button, TextField,
+  MenuItem, Grid, Divider
 } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import api from "@/utils/api"; // adjust path if needed
+import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import api from "@/utils/api";
 
-type Expense = {
+const transactionTypes = ["income", "expense"] as const;
+type TransactionType = typeof transactionTypes[number];
+
+const categories = [
+  "General", "Food", "Transport", "Utilities", "Shopping", "Salary", "Investment", "Other"
+] as const;
+type CategoryType = typeof categories[number];
+
+interface Transaction {
   id: number;
   name: string;
+  category: string;
   amount: number;
-};
+  type: TransactionType;
+  date: string;
+}
+
+interface NewTransaction {
+  name: string;
+  category: string;
+  amount: number;
+  type: TransactionType;
+  date: string;
+}
 
 export default function BudgetPage() {
-  const [income, setIncome] = useState<number | "">("");
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [newTransaction, setNewTransaction] = useState<NewTransaction>({
+    name: "",
+    category: "General",
+    amount: 0,
+    type: "expense",
+    date: new Date().toISOString().split("T")[0],
+  });
+  const [filters, setFilters] = useState({
+    name: "",
+    category: "",
+    type: "",
+    from: "",
+    to: ""
+  });
+
+  const fetchTransactions = async (token: string) => {
+    try {
+      const res = await api.get<Transaction[]>("/transactions", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTransactions(res.data.map(t => ({ ...t, amount: Number(t.amount) })));
+    } catch {
+      alert("Failed to load transactions");
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      fetchExpenses(token);
-    } else {
-      setLoading(false);
-    }
+    if (token) fetchTransactions(token);
   }, []);
 
-  const fetchExpenses = async (token: string) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await api.get<Expense[]>("/expenses", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setExpenses(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Failed to fetch expenses");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveExpenses = async () => {
+  const handleAddTransaction = async () => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      alert("No auth token, please login.");
-      return;
-    }
-
-    setError(null);
+    if (!token || !newTransaction.name || newTransaction.amount <= 0) return;
 
     try {
-      for (const expense of expenses) {
-        if (!expense.name.trim() || expense.amount < 0) {
-          alert("Please enter a valid name and non-negative amount for each expense.");
-          return;
-        }
-
-        await api.post(
-          "/expenses",
-          { name: expense.name, amount: expense.amount },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-
-      alert("Expenses saved!");
-      fetchExpenses(token);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Failed to save expenses");
-      alert(err.message || "Failed to save expenses");
+      const res = await api.post<Transaction>(
+        "/transactions",
+        { ...newTransaction, amount: Number(newTransaction.amount) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTransactions(prev => [...prev, { ...res.data, amount: Number(res.data.amount) }]);
+      setNewTransaction({
+        name: "",
+        category: "General",
+        amount: 0,
+        type: "expense",
+        date: new Date().toISOString().split("T")[0],
+      });
+    } catch {
+      alert("Failed to add transaction");
     }
   };
 
-  const updateExpense = (id: number, field: keyof Expense, value: string) => {
-    setExpenses((prev) =>
-      prev.map((exp) =>
-        exp.id === id
-          ? {
-              ...exp,
-              [field]: field === "amount" ? Number(value) : value,
-            }
-          : exp
-      )
-    );
+  const handleDeleteTransaction = async (id: number) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      await api.delete(`/transactions/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } catch {
+      alert("Delete failed");
+    }
   };
 
-  const addExpense = () => {
-    setExpenses((prev) => [...prev, { id: Date.now(), name: "", amount: 0 }]);
-  };
+  const filtered = transactions.filter(t => {
+    const matchName = filters.name === "" || t.name.toLowerCase().includes(filters.name.toLowerCase());
+    const matchCategory = filters.category === "" || t.category === filters.category;
+    const matchType = filters.type === "" || t.type === filters.type;
+    const matchFrom = filters.from === "" || new Date(t.date) >= new Date(filters.from);
+    const matchTo = filters.to === "" || new Date(t.date) <= new Date(filters.to);
+    return matchName && matchCategory && matchType && matchFrom && matchTo;
+  });
 
-  const removeExpense = (id: number) => {
-    setExpenses((prev) => prev.filter((exp) => exp.id !== id));
-  };
+  const totalIncome = filtered.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = filtered.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+  const net = totalIncome - totalExpenses;
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const remaining = typeof income === "number" ? income - totalExpenses : 0;
-
-  if (loading) return <Typography>Loading...</Typography>;
+  const columns: GridColDef[] = [
+    { field: "name", headerName: "Name", flex: 1 },
+    { field: "category", headerName: "Category", flex: 1 },
+    { field: "amount", headerName: "Amount", type: "number", flex: 1 },
+    { field: "type", headerName: "Type", flex: 1 },
+    { field: "date", headerName: "Date", flex: 1 },
+    {
+      field: "actions",
+      headerName: "Actions",
+      flex: 1,
+      renderCell: ({ row }) => (
+        <Button color="error" onClick={() => handleDeleteTransaction(row.id)}>Delete</Button>
+      ),
+    },
+  ];
 
   return (
-    <Box
-      sx={{
-        background: "linear-gradient(to top, rgb(0,128,255), #e0e7ff)",
-        minHeight: "100vh",
-        py: 4,
-        px: 2,
-        display: "flex",
-        justifyContent: "center",
-      }}
-    >
-      <Paper
-        elevation={6}
-        sx={{
-          maxWidth: 900,
-          width: "100%",
-          borderRadius: 4,
-          backgroundColor: "#fff",
-          p: { xs: 3, md: 5 },
-        }}
-      >
-        <Typography variant="h4" fontWeight="bold" mb={4} textAlign="center">
+    <Box sx={{ py: 6, px: 3, bgcolor: "#f0f2f5", minHeight: "100vh" }}>
+      <Paper sx={{ maxWidth: 1000, mx: "auto", p: 4, borderRadius: 4 }}>
+        <Typography variant="h4" fontWeight="bold" textAlign="center" mb={4}>
           Budget Planner
         </Typography>
 
-        {error && (
-          <Typography color="error" mb={2} textAlign="center">
-            {error}
-          </Typography>
-        )}
+        <Grid container spacing={2} mb={3}>
+          <Grid item xs={12} sm={2}>
+            <TextField label="Name" fullWidth value={newTransaction.name}
+              onChange={(e) => setNewTransaction(p => ({ ...p, name: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField select label="Category" fullWidth value={newTransaction.category}
+              onChange={(e) => setNewTransaction(p => ({ ...p, category: e.target.value }))}>
+              {categories.map(cat => <MenuItem key={cat} value={cat}>{cat}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField label="Amount" type="number" fullWidth value={newTransaction.amount}
+              onChange={(e) => setNewTransaction(p => ({ ...p, amount: +e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField select label="Type" fullWidth value={newTransaction.type}
+              onChange={(e) => setNewTransaction(p => ({ ...p, type: e.target.value as TransactionType }))}>
+              {transactionTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField label="Date" type="date" fullWidth value={newTransaction.date}
+              onChange={(e) => setNewTransaction(p => ({ ...p, date: e.target.value }))} InputLabelProps={{ shrink: true }} />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <Button variant="contained" fullWidth onClick={handleAddTransaction}>Add</Button>
+          </Grid>
+        </Grid>
 
-        <Box mb={4} maxWidth={400} mx="auto">
-          <TextField
-            label="Total Income"
-            type="number"
-            fullWidth
-            value={income}
-            onChange={(e) => {
-              const val = e.target.value;
-              setIncome(val === "" ? "" : Math.max(0, Number(val)));
-            }}
-            inputProps={{ min: 0 }}
+        <Divider sx={{ my: 3 }} />
+
+        <Typography variant="h6" gutterBottom>Filters</Typography>
+        <Grid container spacing={2} mb={2}>
+          <Grid item xs={12} sm={3}>
+            <TextField label="Search Name" fullWidth value={filters.name}
+              onChange={(e) => setFilters(f => ({ ...f, name: e.target.value }))} />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField select label="Category" fullWidth value={filters.category}
+              onChange={(e) => setFilters(f => ({ ...f, category: e.target.value }))}>
+              <MenuItem value="">All</MenuItem>
+              {categories.map(cat => <MenuItem key={cat} value={cat}>{cat}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField select label="Type" fullWidth value={filters.type}
+              onChange={(e) => setFilters(f => ({ ...f, type: e.target.value }))}>
+              <MenuItem value="">All</MenuItem>
+              {transactionTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid item xs={6} sm={2}>
+            <TextField label="From" type="date" fullWidth value={filters.from}
+              onChange={(e) => setFilters(f => ({ ...f, from: e.target.value }))} InputLabelProps={{ shrink: true }} />
+          </Grid>
+          <Grid item xs={6} sm={2}>
+            <TextField label="To" type="date" fullWidth value={filters.to}
+              onChange={(e) => setFilters(f => ({ ...f, to: e.target.value }))} InputLabelProps={{ shrink: true }} />
+          </Grid>
+        </Grid>
+
+        <Box sx={{ height: 500, width: "100%", bgcolor: "#fff", borderRadius: 2 }}>
+          <DataGrid
+            rows={filtered}
+            columns={columns}
+            pageSizeOptions={[5, 10, 25]}
+            initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
           />
         </Box>
 
-        <Box mb={3}>
-          <Typography variant="h6" fontWeight="bold" mb={2}>
-            Expenses
-          </Typography>
+        <Divider sx={{ my: 4 }} />
 
-          {expenses.map(({ id, name, amount }) => (
-            <Box key={id} display="flex" gap={2} alignItems="center" mb={2}>
-              <TextField
-                label="Expense Name"
-                value={name}
-                onChange={(e) => updateExpense(id, "name", e.target.value)}
-                sx={{ flex: "2 1 200px" }}
-              />
-              <TextField
-                label="Amount"
-                type="number"
-                value={amount}
-                onChange={(e) => updateExpense(id, "amount", e.target.value)}
-                inputProps={{ min: 0 }}
-                sx={{ flex: "1 1 120px" }}
-              />
-              {expenses.length > 1 && (
-                <IconButton color="error" onClick={() => removeExpense(id)}>
-                  <DeleteIcon />
-                </IconButton>
-              )}
-            </Box>
-          ))}
-
-          <Button variant="outlined" onClick={addExpense} sx={{ mt: 1 }}>
-            + Add Expense
-          </Button>
-        </Box>
-
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={saveExpenses}
-          sx={{ mt: 2, mb: 4 }}
-        >
-          Save Expenses
-        </Button>
-
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          maxWidth={400}
-          mx="auto"
-          mt={4}
-          p={3}
-          borderRadius={2}
-          bgcolor="#f0f4ff"
-        >
-          <Typography variant="subtitle1" fontWeight="medium">
-            Total Expenses:
-          </Typography>
-          <Typography variant="subtitle1" fontWeight="bold">
-            ${totalExpenses.toFixed(2)}
-          </Typography>
-
-          <Typography variant="subtitle1" fontWeight="medium">
-            Remaining Budget:
-          </Typography>
-          <Typography
-            variant="subtitle1"
-            fontWeight="bold"
-            color={remaining < 0 ? "error.main" : "success.main"}
-          >
-            ${remaining.toFixed(2)}
+        <Box display="flex" justifyContent="space-between">
+          <Typography fontWeight="bold">Total Income: ${totalIncome.toFixed(2)}</Typography>
+          <Typography fontWeight="bold">Total Expenses: ${totalExpenses.toFixed(2)}</Typography>
+          <Typography fontWeight="bold" color={net >= 0 ? "green" : "red"}>
+            Net Balance: ${net.toFixed(2)}
           </Typography>
         </Box>
       </Paper>
