@@ -5,7 +5,7 @@ import {
   Box, Paper, Typography, Button, TextField, MenuItem,
 } from "@mui/material";
 import {
-  DataGrid, GridColDef, GridRenderEditCellParams,
+  DataGrid, GridColDef, GridRenderEditCellParams, GridValueFormatter,
 } from "@mui/x-data-grid";
 import {
   LocalizationProvider, DatePicker,
@@ -103,7 +103,15 @@ export default function BudgetPage() {
     api.get<Transaction[]>("/transactions/", {
       headers: { Authorization: `Bearer ${t}` },
     })
-      .then(res => setTransactions(res.data.map(t => ({ ...t, amount: Number(t.amount) }))))
+      .then(res => {
+        const txs = res.data.map(t => ({
+          ...t,
+          amount: Number(t.amount),
+          date: t.date, // do not slice or format here
+        }));
+        console.log("Loaded transactions:", txs); // Check your dates here
+        setTransactions(txs);
+      })
       .catch(() => alert("Failed to load transactions"));
   }, []);
 
@@ -132,7 +140,7 @@ export default function BudgetPage() {
     const t = token();
     if (!t) return oldRow;
 
-    const changed: Partial<Transaction> = {};
+    const changed: Partial<Record<keyof Transaction, string | number>> = {};
     for (const key of Object.keys(newRow) as (keyof Transaction)[]) {
       if (newRow[key] !== oldRow[key]) {
         changed[key] = key === "date"
@@ -170,26 +178,63 @@ export default function BudgetPage() {
   };
 
   const columns: GridColDef[] = [
-    { field: "name", headerName: "Name", flex: 1, editable: true },
     {
-      field: "category", headerName: "Category", flex: 1, editable: true,
+      field: "name",
+      headerName: "Name",
+      flex: 1,
+      editable: true,
+      align: "left",
+      headerAlign: "left",
+    },
+    {
+      field: "category",
+      headerName: "Category",
+      flex: 1,
+      editable: true,
+      align: "left",
+      headerAlign: "left",
       renderEditCell: (params) => <CategoryEditInputCell {...params} />
     },
-    { field: "amount", headerName: "Amount", flex: 1, editable: true },
     {
-      field: "type", headerName: "Type", flex: 1, editable: true,
-      type: "singleSelect", valueOptions: ["income", "expense"]
+      field: "amount",
+      headerName: "Amount",
+      flex: 1,
+      editable: true,
+      align: "left",
+      headerAlign: "left",
     },
     {
-      field: "date", headerName: "Date", flex: 1, editable: true,
+      field: "type",
+      headerName: "Type",
+      flex: 1,
+      editable: true,
+      type: "singleSelect",
+      valueOptions: ["income", "expense"],
+      align: "left",
+      headerAlign: "left",
+    },
+    {
+      field: "date",
+      headerName: "Date",
+      flex: 1,
+      editable: true,
+      align: "left",
+      headerAlign: "left",
+      type: "date",
       renderEditCell: (params) => <DateEditInputCell {...params} />,
-      valueFormatter: (params) => {
+      valueFormatter: (params: { value: any }) => {
+        if (!params.value) return "";
         const date = dayjs(params.value);
-        return date.isValid() ? date.format("YYYY-MM-DD") : params.value || "";
+        return date.isValid() ? date.format("YYYY-MM-DD") : "";
       }
     },
     {
-      field: "actions", headerName: "Actions", flex: 0.5, sortable: false,
+      field: "actions",
+      headerName: "Actions",
+      flex: 0.5,
+      sortable: false,
+      align: "left",
+      headerAlign: "left",
       renderCell: ({ row }) => (
         <Button color="error" onClick={() => handleDelete(row.id)}>Delete</Button>
       )
