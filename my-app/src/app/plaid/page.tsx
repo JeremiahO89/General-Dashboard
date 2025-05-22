@@ -1,25 +1,29 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
-import api from "@/utils/api"; // Adjust if needed
+import api from "@/utils/api";
 
 type CreateLinkTokenResponse = {
   link_token: string;
 };
 
-type ExchangePublicTokenResponse = {
-  access_token: string;
-};
+function getToken() {
+  return localStorage.getItem("token");
+}
 
 export default function PlaidLinkComponent() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
     api
-      .post<CreateLinkTokenResponse>("/plaid/create_link_token")
+      .post<CreateLinkTokenResponse>("/plaid/create_link_token", null, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((res) => {
         setLinkToken(res.data.link_token);
       })
@@ -31,18 +35,17 @@ export default function PlaidLinkComponent() {
   const { open, ready } = usePlaidLink({
     token: linkToken ?? "",
     onSuccess: (public_token: string) => {
-      api
-        .post<ExchangePublicTokenResponse>("/plaid/exchange_public_token", {
-          public_token,
-        })
-        .then((res) => {
-          setAccessToken(res.data.access_token);
-          setError(null);
+      const token = getToken();
+      if (!token) return;
 
-          // Fetch transactions after exchanging token
+      api
+        .post("/plaid/exchange_public_token", { public_token }, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then(() => {
           return api.get("/plaid/transactions", {
+            headers: { Authorization: `Bearer ${token}` },
             params: {
-              access_token: res.data.access_token,
               start_date: new Date("2024-01-01").toISOString().split("T")[0],
               end_date: new Date().toISOString().split("T")[0],
             },
@@ -74,13 +77,6 @@ export default function PlaidLinkComponent() {
       <button onClick={() => open()} disabled={!ready || !linkToken}>
         Connect a Bank Account
       </button>
-
-      {accessToken && (
-        <div style={{ marginTop: 20 }}>
-          <h4>Access Token (store securely):</h4>
-          <code>{accessToken}</code>
-        </div>
-      )}
 
       {transactions && (
         <div style={{ marginTop: 20 }}>
