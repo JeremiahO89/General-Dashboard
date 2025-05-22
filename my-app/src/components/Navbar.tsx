@@ -16,9 +16,9 @@ export default function Navbar() {
       position="sticky"
       elevation={0}
       sx={{
-        background: "rgba(255, 255, 255, 0)",
+        background: "rgb(48, 47, 47)",
         backdropFilter: "blur(16px)",
-        borderBottom: "1px solid rgba(0,0,0,0.07)",
+        borderBottom: "1px solid rgb(0, 0, 0)",
       }}
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -35,6 +35,9 @@ export default function Navbar() {
         <Box>
           <Button component={Link} href="/" color="inherit" sx={{ mx: 1 }}>
             Home
+          </Button>
+          <Button component={Link} href="/plaid" color="inherit" sx={{ mx: 1 }}>
+            plaid
           </Button>
           <Button component={Link} href="/budgeting" color="inherit" sx={{ mx: 1 }}>
             Budget

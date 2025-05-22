@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "react-plaid-link": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react-plaid-link": "^1.3.1"
+  }
+}
