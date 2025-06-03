@@ -19,68 +19,105 @@ import { usePlaidLink } from "react-plaid-link";
 import { useRouter } from "next/navigation";
 import api from "@/utils/api";
 
+// Types from your definitions
+import type {
+  Balance,
+  PlaidAccountSummary,
+  CreateLinkTokenResponse,
+  ExchangeTokenResponse,
+} from "@/types/types";
+
+type CompiledBalance = {
+  bankName: string;
+  accountType: string;
+  balance: number;
+  dateCreated: string; // ISO string or formatted string
+};
+
+
 const getToken = () => localStorage.getItem("token");
 
 export default function BankLinker() {
   const router = useRouter();
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState<any[] | null>(null);
-  const [institutions, setInstitutions] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
   const token = getToken();
 
-  const getInstitutionName = async (id: string) => {
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<CompiledBalance[] | null>(null);
+  const [institutions, setInstitutions] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch institution name and cache it
+  const getInstitutionName = async (id: string): Promise<string> => {
     if (institutions[id]) return institutions[id];
     try {
-      const { data } = await api.get(`/plaid/institution/info?institution_id=${id}`);
-      setInstitutions(prev => ({ ...prev, [id]: data.name }));
+      const { data } = await api.get<{ name: string }>(
+        `/plaid/institution/info?institution_id=${id}`
+      );
+      setInstitutions((prev) => ({ ...prev, [id]: data.name }));
       return data.name;
     } catch {
       return id;
     }
   };
 
-  const loadAccounts = async () => {
-    try {
-      const { data:balances } = await api.get("/plaid/balances/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+const loadAccounts = async () => {
+  try {
+    const { data: balances } = await api.get<Balance[]>("/plaid/balances/all", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const { data:account_data } = await api.get("/plaid/accounts/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      for (const acct of balances) {
-        const matchingAccount = account_data.find(
-          (a: any) => a.item_id === acct.item_id
-        );
+    const { data: accountData } = await api.get<PlaidAccountSummary[]>("/plaid/accounts/all", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-        if (matchingAccount?.institution_id) {
-          await getInstitutionName(matchingAccount.institution_id);
-        }
+    const compiledBalanceList: CompiledBalance[] = [];
+
+    for (const balance of balances) {
+      const matchingAccount = accountData.find((a) => a.item_id === balance.item_id);
+
+      let bankName = "Unknown";
+      if (matchingAccount?.institution_id) {
+        bankName = await getInstitutionName(matchingAccount.institution_id);
       }
 
-      setAccounts(balances);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
-    }
-  };
+      const newCompiledBalance: CompiledBalance = {
+        bankName,
+        accountType: balance.subtype || "Unknown",
+        balance: balance.current ?? 0,
+        dateCreated: new Date(balance.last_updated).toLocaleString(),
+      };
 
+      compiledBalanceList.push(newCompiledBalance);
+    }
+
+    setAccounts(compiledBalanceList);
+  } catch (err: any) {
+    setError(err.response?.data?.detail || err.message);
+  }
+};
+
+  // Create a new Plaid link token
   const createLinkToken = async () => {
     try {
-      const { data } = await api.post("/plaid/create_link_token", null, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { data } = await api.post<CreateLinkTokenResponse>(
+        "/plaid/create_link_token",
+        null,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setLinkToken(data.link_token);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
     }
   };
 
+  // Handle successful Plaid Link flow by exchanging public token and refreshing balances
   const handleSuccess = async (public_token: string) => {
     try {
-      await api.post("/plaid/exchange_public_token", { public_token }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post<ExchangeTokenResponse>(
+        "/plaid/exchange_public_token",
+        { public_token },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       await api.post("/plaid/balances/update_all", null, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -93,7 +130,8 @@ export default function BankLinker() {
   const { open, ready } = usePlaidLink({
     token: linkToken || "",
     onSuccess: handleSuccess,
-    onExit: (err) => err && setError(`Plaid exited: ${err.display_message || err.error_message}`),
+    onExit: (err) =>
+      err && setError(`Plaid exited: ${err.display_message || err.error_message}`),
   });
 
   useEffect(() => {
@@ -126,11 +164,17 @@ export default function BankLinker() {
 
         {error && <Typography color="error">{error}</Typography>}
 
-        <Button onClick={open} disabled={!ready || !linkToken} variant="contained" fullWidth sx={{ mb: 3 }}>
+        <Button
+          onClick={open}
+          disabled={!ready || !linkToken}
+          variant="contained"
+          fullWidth
+          sx={{ mb: 3 }}
+        >
           {ready ? "Link a Bank Account" : <CircularProgress size={20} />}
         </Button>
 
-        {accounts?.length > 0 && (
+        {accounts && accounts.length > 0 && (
           <Table>
             <TableHead>
               <TableRow>
@@ -141,12 +185,12 @@ export default function BankLinker() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {accounts.map(acct => (
-                <TableRow key={acct.account_id}>
-                  <TableCell>{institutions[acct.institution_id] || "Unknown"}</TableCell>
-                  <TableCell>{acct.subtype}</TableCell>
-                  <TableCell>${acct.current?.toFixed(2) ?? "0.00"}</TableCell>
-                  <TableCell>{acct.last_updated ? new Date(acct.last_updated).toLocaleString() : ""}</TableCell>
+              {accounts.map((acct, index) => (
+                <TableRow key={index}>
+                  <TableCell>{acct.bankName}</TableCell>
+                  <TableCell>{acct.accountType}</TableCell>
+                  <TableCell>${(acct.balance ?? 0).toFixed(2)}</TableCell>
+                  <TableCell>{acct.dateCreated}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
