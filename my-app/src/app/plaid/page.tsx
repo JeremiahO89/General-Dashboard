@@ -19,7 +19,6 @@ import { usePlaidLink } from "react-plaid-link";
 import { useRouter } from "next/navigation";
 import api from "@/utils/api";
 
-// Types from your definitions
 import type {
   Balance,
   PlaidAccountSummary,
@@ -31,9 +30,8 @@ type CompiledBalance = {
   bankName: string;
   accountType: string;
   balance: number;
-  dateCreated: string; // ISO string or formatted string
+  dateCreated: string;
 };
-
 
 const getToken = () => localStorage.getItem("token");
 
@@ -46,7 +44,6 @@ export default function BankLinker() {
   const [institutions, setInstitutions] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch institution name and cache it
   const getInstitutionName = async (id: string): Promise<string> => {
     if (institutions[id]) return institutions[id];
     try {
@@ -60,43 +57,39 @@ export default function BankLinker() {
     }
   };
 
-const loadAccounts = async () => {
-  try {
-    const { data: balances } = await api.get<Balance[]>("/plaid/balances/all", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  const loadAccounts = async () => {
+    try {
+      const { data: balances } = await api.get<Balance[]>("/plaid/balances/all", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const { data: accountData } = await api.get<PlaidAccountSummary[]>("/plaid/accounts/all", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      const { data: accountData } = await api.get<PlaidAccountSummary[]>("/plaid/accounts/all", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const compiledBalanceList: CompiledBalance[] = [];
+      const compiledBalanceList: CompiledBalance[] = [];
 
-    for (const balance of balances) {
-      const matchingAccount = accountData.find((a) => a.item_id === balance.item_id);
+      for (const balance of balances) {
+        const matchingAccount = accountData.find((a) => a.item_id === balance.item_id);
+        let bankName = "Unknown";
+        if (matchingAccount?.institution_id) {
+          bankName = await getInstitutionName(matchingAccount.institution_id);
+        }
 
-      let bankName = "Unknown";
-      if (matchingAccount?.institution_id) {
-        bankName = await getInstitutionName(matchingAccount.institution_id);
+        compiledBalanceList.push({
+          bankName,
+          accountType: balance.subtype || "Unknown",
+          balance: balance.current ?? 0,
+          dateCreated: new Date(balance.last_updated).toLocaleString(),
+        });
       }
 
-      const newCompiledBalance: CompiledBalance = {
-        bankName,
-        accountType: balance.subtype || "Unknown",
-        balance: balance.current ?? 0,
-        dateCreated: new Date(balance.last_updated).toLocaleString(),
-      };
-
-      compiledBalanceList.push(newCompiledBalance);
+      setAccounts(compiledBalanceList);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
     }
+  };
 
-    setAccounts(compiledBalanceList);
-  } catch (err: any) {
-    setError(err.response?.data?.detail || err.message);
-  }
-};
-
-  // Create a new Plaid link token
   const createLinkToken = async () => {
     try {
       const { data } = await api.post<CreateLinkTokenResponse>(
@@ -110,7 +103,6 @@ const loadAccounts = async () => {
     }
   };
 
-  // Handle successful Plaid Link flow by exchanging public token and refreshing balances
   const handleSuccess = async (public_token: string) => {
     try {
       await api.post<ExchangeTokenResponse>(
@@ -135,9 +127,18 @@ const loadAccounts = async () => {
   });
 
   useEffect(() => {
+    if (ready) {
+      open();
+    }
+  }, [ready, open]);
+
+  const handleButtonClick = async () => {
+    await createLinkToken();
+  };
+
+  useEffect(() => {
     if (token) {
       loadAccounts();
-      createLinkToken();
     }
   }, [token]);
 
@@ -165,13 +166,13 @@ const loadAccounts = async () => {
         {error && <Typography color="error">{error}</Typography>}
 
         <Button
-          onClick={open}
-          disabled={!ready || !linkToken}
+          onClick={handleButtonClick}
+          disabled={!token}
           variant="contained"
           fullWidth
           sx={{ mb: 3 }}
         >
-          {ready ? "Link a Bank Account" : <CircularProgress size={20} />}
+          {"Link a Bank Account"}
         </Button>
 
         {accounts && accounts.length > 0 && (
@@ -189,7 +190,7 @@ const loadAccounts = async () => {
                 <TableRow key={index}>
                   <TableCell>{acct.bankName}</TableCell>
                   <TableCell>{acct.accountType}</TableCell>
-                  <TableCell>${(acct.balance ?? 0).toFixed(2)}</TableCell>
+                  <TableCell>${acct.balance.toFixed(2)}</TableCell>
                   <TableCell>{acct.dateCreated}</TableCell>
                 </TableRow>
               ))}
