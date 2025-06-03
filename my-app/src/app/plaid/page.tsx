@@ -43,6 +43,8 @@ export default function BankLinker() {
   const [accounts, setAccounts] = useState<CompiledBalance[] | null>(null);
   const [institutions, setInstitutions] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [updatingBalances, setUpdatingBalances] = useState(false);
 
   const getInstitutionName = async (id: string): Promise<string> => {
     if (institutions[id]) return institutions[id];
@@ -100,6 +102,26 @@ export default function BankLinker() {
       setLinkToken(data.link_token);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
+    }
+  };
+
+  const updateBalances = async () => {
+    setUpdatingBalances(true);
+    setError(null);
+    try {
+      await api.post(
+        "/plaid/balances/update_all",
+        null,
+        {
+          params: { force: forceUpdate },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      await loadAccounts();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setUpdatingBalances(false);
     }
   };
 
@@ -172,30 +194,51 @@ export default function BankLinker() {
           fullWidth
           sx={{ mb: 3 }}
         >
-          {"Link a Bank Account"}
+          Link a Bank Account
         </Button>
 
         {accounts && accounts.length > 0 && (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Bank</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Balance</TableCell>
-                <TableCell>Last Updated</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {accounts.map((acct, index) => (
-                <TableRow key={index}>
-                  <TableCell>{acct.bankName}</TableCell>
-                  <TableCell>{acct.accountType}</TableCell>
-                  <TableCell>${acct.balance.toFixed(2)}</TableCell>
-                  <TableCell>{acct.dateCreated}</TableCell>
+          <>
+            <Box display="flex" alignItems="center" gap={2} mb={2}>
+              <Button
+                onClick={updateBalances}
+                disabled={updatingBalances}
+                variant="outlined"
+              >
+                {updatingBalances ? <CircularProgress size={20} /> : "Refresh Balances"}
+              </Button>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={forceUpdate}
+                  onChange={(e) => setForceUpdate(e.target.checked)}
+                  style={{ marginRight: "0.5rem" }}
+                />
+                Force update
+              </label>
+            </Box>
+
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Bank</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Balance</TableCell>
+                  <TableCell>Last Updated</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {accounts.map((acct, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{acct.bankName}</TableCell>
+                    <TableCell>{acct.accountType}</TableCell>
+                    <TableCell>${acct.balance.toFixed(2)}</TableCell>
+                    <TableCell>{acct.dateCreated}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
         )}
       </Paper>
     </Box>
