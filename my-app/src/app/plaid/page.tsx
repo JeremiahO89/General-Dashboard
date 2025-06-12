@@ -18,10 +18,9 @@ import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import { usePlaidLink } from "react-plaid-link";
 import { useRouter } from "next/navigation";
 import api from "@/utils/api";
+import { loadUserAccounts } from "./bank_loader";
 
 import type {
-  Balance,
-  PlaidAccountSummary,
   CreateLinkTokenResponse,
   ExchangeTokenResponse,
 } from "@/types/types";
@@ -45,52 +44,6 @@ export default function BankLinker() {
   const [error, setError] = useState<string | null>(null);
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatingBalances, setUpdatingBalances] = useState(false);
-
-  const getInstitutionName = async (id: string): Promise<string> => {
-    if (institutions[id]) return institutions[id];
-    try {
-      const { data } = await api.get<{ name: string }>(
-        `/plaid/institution/info?institution_id=${id}`
-      );
-      setInstitutions((prev) => ({ ...prev, [id]: data.name }));
-      return data.name;
-    } catch {
-      return id;
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      const { data: balances } = await api.get<Balance[]>("/plaid/balances/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const { data: accountData } = await api.get<PlaidAccountSummary[]>("/plaid/accounts/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const compiledBalanceList: CompiledBalance[] = [];
-
-      for (const balance of balances) {
-        const matchingAccount = accountData.find((a) => a.item_id === balance.item_id);
-        let bankName = "Unknown";
-        if (matchingAccount?.institution_id) {
-          bankName = await getInstitutionName(matchingAccount.institution_id);
-        }
-
-        compiledBalanceList.push({
-          bankName,
-          accountType: balance.subtype || "Unknown",
-          balance: balance.current ?? 0,
-          dateCreated: new Date(balance.last_updated).toLocaleString(),
-        });
-      }
-
-      setAccounts(compiledBalanceList);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
-    }
-  };
 
   const createLinkToken = async () => {
     try {
@@ -117,7 +70,7 @@ export default function BankLinker() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      await loadAccounts();
+      await loadUserAccounts(token!, setAccounts, setInstitutions, setError, institutions);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
     } finally {
@@ -135,7 +88,7 @@ export default function BankLinker() {
       await api.post("/plaid/balances/update_all", null, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      await loadAccounts();
+      await loadUserAccounts(token!, setAccounts, setInstitutions, setError, institutions);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message);
     }
@@ -152,7 +105,7 @@ export default function BankLinker() {
     if (ready) {
       open();
     }
-  }, [ready, open]);
+  }, [ready]);
 
   const handleButtonClick = async () => {
     await createLinkToken();
@@ -160,7 +113,7 @@ export default function BankLinker() {
 
   useEffect(() => {
     if (token) {
-      loadAccounts();
+      loadUserAccounts(token, setAccounts, setInstitutions, setError, institutions);
     }
   }, [token]);
 
@@ -233,7 +186,11 @@ export default function BankLinker() {
                     <TableCell>{acct.bankName}</TableCell>
                     <TableCell>{acct.accountType}</TableCell>
                     <TableCell>${acct.balance.toFixed(2)}</TableCell>
-                    <TableCell>{acct.dateCreated}</TableCell>
+                    <TableCell>
+                      {acct.dateCreated.split(", ").map((part, i) => (
+                        <div key={i}>{part}</div>
+                      ))}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
