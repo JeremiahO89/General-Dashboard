@@ -64,7 +64,7 @@ const prepareStackedBarData = (
     return row;
   });
 
-// Modern Pie Chart: No labels on slices, legend only
+// --- PIE CHART ---
 function ModernPieChartBox({
   title,
   data,
@@ -141,15 +141,18 @@ function ModernPieChartBox({
 
   return (
     <Paper
+      elevation={4}
       sx={{
         p: 3,
+        borderRadius: 3,
         height: "100%",
+        minHeight: 420,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        minWidth: 0,
+        bgcolor: "#ffffff",
+        boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
       }}
-      elevation={4}
     >
       <Typography variant="h6" gutterBottom align="center" sx={{ width: "100%" }}>
         {title}
@@ -164,7 +167,7 @@ function ModernPieChartBox({
           alignItems: "flex-start",
         }}
       >
-        <ResponsiveContainer width="60%" height={300} minWidth={200}>
+        <ResponsiveContainer width="75%" height={300} minWidth={200}>
           <PieChart>
             <Pie
               data={data}
@@ -185,14 +188,14 @@ function ModernPieChartBox({
           </PieChart>
         </ResponsiveContainer>
       </Box>
-      {/* Legend at the bottom, closer to the ring */}
+      {/* Legend at the very bottom, left-aligned and centered horizontally */}
       <Box
         sx={{
           width: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          mt: -2, // Move legend closer to the ring
+          mt: 2,
         }}
       >
         <Box
@@ -246,7 +249,7 @@ function ModernPieChartBox({
   );
 }
 
-// Modern Horizontal Bar Chart: Grouped by account type, value labels at end
+// --- BAR CHART ---
 function ModernBarChartBox({
   data,
   accountTypes,
@@ -254,70 +257,186 @@ function ModernBarChartBox({
   data: any[];
   accountTypes: string[];
 }) {
+  // Calculate max value for scaling
+  const allValues = data.flatMap(row => accountTypes.map(type => row[type] || 0));
+  const maxValue = Math.max(...allValues, 1);
+  const domainMax = Math.ceil(Math.max(maxValue * 1.1, maxValue + 100) / 100) * 100;
+
+  // Calculate totals for legend
+  const typeTotals: Record<string, number> = {};
+  data.forEach(row => {
+    accountTypes.forEach(type => {
+      typeTotals[type] = (typeTotals[type] || 0) + (row[type] || 0);
+    });
+  });
+  const total = Object.values(typeTotals).reduce((a, b) => a + b, 0);
+
+  // Modern tooltip
+  function CustomTooltip({ active, payload }: any) {
+    if (active && payload && payload.length) {
+      const entry = payload[0];
+      return (
+        <Paper
+          elevation={6}
+          sx={{
+            px: 2,
+            py: 1,
+            bgcolor: "#fff",
+            borderRadius: 2,
+            minWidth: 120,
+            border: `2px solid ${entry.color}`,
+            boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
+          }}
+        >
+          <Box display="flex" alignItems="center" mb={0.5}>
+            <Box
+              sx={{
+                width: 14,
+                height: 14,
+                bgcolor: entry.color,
+                borderRadius: "4px",
+                mr: 1,
+                flexShrink: 0,
+              }}
+            />
+            <Typography variant="subtitle2" fontWeight={700}>
+              {entry.name}
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            <b>${entry.value?.toLocaleString()}</b>
+          </Typography>
+        </Paper>
+      );
+    }
+    return null;
+  }
+
   return (
     <Paper
+      elevation={4}
       sx={{
         p: 3,
+        borderRadius: 4,
         height: "100%",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         minWidth: 0,
       }}
-      elevation={4}
     >
-      <Typography variant="h6" gutterBottom textAlign="center">
+      <Typography variant="h6" textAlign="center" gutterBottom>
         Balances by Bank & Type
       </Typography>
-      <ResponsiveContainer width="100%" height={300} minWidth={300}>
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
-          barGap={8}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            type="number"
-            tickFormatter={(v) => `$${v}`}
-            domain={[0, "dataMax + 500"]}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={120}
-            tick={{ fontWeight: 600 }}
-          />
-          <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
-          <Legend />
-          {accountTypes.map((type, i) => (
-            <Bar
-              key={type}
-              dataKey={type}
-              fill={COLORS[i % COLORS.length]}
-              maxBarSize={32}
-              radius={[6, 6, 6, 6]}
-              isAnimationActive={false}
-            >
-              <LabelList
+      <Box
+        sx={{
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start", // Left justify the chart
+        }}
+      >
+        <ResponsiveContainer width="100%" height={320} minWidth={250}>
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 20, right: 40, left: 10, bottom: 20 }}
+            barGap={10}
+          >
+            <XAxis
+              type="number"
+              tick={false} // <-- Hide X axis labels
+              axisLine={false}
+              tickLine={false}
+              domain={[0, domainMax]}
+              allowDataOverflow={false}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={60} // Reduce width so chart area is larger
+              tick={{ fontWeight: 550, fontSize: 14 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {accountTypes.map((type, i) => (
+              <Bar
+                key={type}
                 dataKey={type}
-                position="right"
-                formatter={(v: number) => (v > 0 ? `$${v.toFixed(0)}` : "")}
-                style={{
-                  fill: "#222",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  textShadow: "0 0 2px #fff",
+                fill={COLORS[i % COLORS.length]}
+                maxBarSize={22} // thinner bars
+                radius={[8, 8, 8, 8]}
+                isAnimationActive={false}
+                barSize={14} // thinner bars
+              >
+                <LabelList
+                  dataKey={type}
+                  position="right"
+                  formatter={(v: number) => (v > 0 ? `$${v.toLocaleString()}` : "")}
+                  style={{
+                    fill: "#222",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    textShadow: "0 0 2px #fff",
+                  }}
+                />
+              </Bar>
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+        {/* Custom Legend below the chart, left-aligned and centered */}
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: 340,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            mt: 2,
+          }}
+        >
+          {accountTypes.map((type, i) => (
+            <Box
+              key={type}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                mb: 1,
+                width: "100%",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  bgcolor: COLORS[i % COLORS.length],
+                  borderRadius: "4px",
+                  mr: 1,
+                  flexShrink: 0,
                 }}
               />
-            </Bar>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 500,
+                  color: "#222",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  flexGrow: 1,
+                }}
+              >
+                {type}: ${typeTotals[type]?.toLocaleString() ?? 0}{" "}
+                ({total > 0 ? ((typeTotals[type] / total) * 100).toFixed(1) : 0}%)
+              </Typography>
+            </Box>
           ))}
-        </BarChart>
-      </ResponsiveContainer>
+        </Box>
+      </Box>
     </Paper>
   );
 }
-
 export default function DashboardPage() {
   const [accounts, setAccounts] = useState<CompiledBalance[]>([]);
   const [institutions, setInstitutions] = useState<Record<string, string>>({});
@@ -426,68 +545,105 @@ export default function DashboardPage() {
   const barData = prepareStackedBarData(accounts, banks, accountTypes);
 
   return (
-    <Box p={4} minHeight="100vh" sx={{ bgcolor: "#f0f2f5" }}>
-      <Typography variant="h4" align="center" fontWeight="bold" gutterBottom>
+    <Box p={4} minHeight="100vh" sx={{ bgcolor: "#e0f7fa" }}>
+      <Typography
+        variant="h4"
+        align="center"
+        fontWeight="bold"
+        gutterBottom
+        sx={{ color: "#01579b", mb: 4 }}
+      >
         Dashboard Overview
       </Typography>
 
-      <Grid container spacing={4} justifyContent="center" sx={{ mb: 5 }}>
-        <Grid item xs={12} sm={4} md={3}>
-          <Card elevation={3}>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Typography variant="subtitle1" color="textSecondary">
-                Total Balance
-              </Typography>
-              <Typography variant="h5" color="primary" fontWeight="bold">
-                ${totalBalance.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <Card elevation={3}>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Typography variant="subtitle1" color="textSecondary">
-                Banks Connected
-              </Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {banks.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <Card elevation={3}>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Typography variant="subtitle1" color="textSecondary">
-                Account Types
-              </Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {accountTypes.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <Card elevation={3}>
-            <CardContent sx={{ textAlign: "center" }}>
-              <Typography variant="subtitle1" color="textSecondary">
-                Total Accounts
-              </Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {accounts.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      <Grid container spacing={2} justifyContent="center" sx={{ mb: 4 }}>
+        {/* Info Cards */}
+        {[{
+          label: "Total Balance",
+          value: `$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          color: "primary"
+        }, {
+          label: "Banks Connected",
+          value: banks.length,
+          color: "secondary"
+        }, {
+          label: "Account Types",
+          value: accountTypes.length,
+          color: "info"
+        }, {
+          label: "Total Accounts",
+          value: accounts.length,
+          color: "success"
+        }].map((item, idx) => (
+          <Grid item xs={12} sm={6} md={3} key={item.label}>
+            <Card
+              elevation={4}
+              sx={{
+                borderRadius: 3,
+                bgcolor: "#ffffff",
+                boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
+                minHeight: 120,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                p: 2,
+              }}
+            >
+              <CardContent sx={{ textAlign: "center", p: 0 }}>
+                <Typography variant="subtitle1" color="textSecondary" sx={{ mb: 1 }}>
+                  {item.label}
+                </Typography>
+                <Typography
+                  variant="h5"
+                  fontWeight="bold"
+                  color={item.color}
+                  sx={{ fontSize: 28 }}
+                >
+                  {item.value}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
-      <Grid container spacing={4} justifyContent="center" alignItems="stretch">
+      <Grid container spacing={2} justifyContent="center" alignItems="stretch">
         <Grid item xs={12} md={6}>
-          <ModernPieChartBox title="Balances by Account Type" data={pieTypeData} />
+          <Paper
+            elevation={4}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              height: "100%",
+              minHeight: 420,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              bgcolor: "#ffffff",
+              boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
+            }}
+          >
+            <ModernPieChartBox title="Balances by Account Type" data={pieTypeData} />
+          </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
-          <ModernBarChartBox data={barData} accountTypes={accountTypes} />
+          <Paper
+            elevation={4}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              height: "100%",
+              minHeight: 420,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              bgcolor: "#ffffff",
+              boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
+            }}
+          >
+            <ModernBarChartBox data={barData} accountTypes={accountTypes} />
+          </Paper>
         </Grid>
       </Grid>
     </Box>
