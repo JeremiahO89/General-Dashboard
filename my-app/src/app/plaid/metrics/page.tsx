@@ -1,42 +1,24 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
   Paper,
   Grid,
   Card,
-  CardContent,
   CircularProgress,
 } from "@mui/material";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LabelList,
-} from "recharts";
 import api from "@/utils/api";
 import type { Balance, PlaidAccountSummary } from "@/types/types";
+import ModernPieChartBox from "@/components/ModernPieChart";
+import ModernBarChartBox from "@/components/ModernBarChart";
 
 type CompiledBalance = {
   bankName: string;
   accountType: string;
   balance: number;
 };
-
-const COLORS = [
-  "#0088FE", "#00C49F", "#FFBB28", "#FF8042",
-  "#A569BD", "#CD6155", "#5499C7", "#48C9B0"
-];
 
 const getToken = () => localStorage.getItem("token");
 
@@ -54,7 +36,7 @@ const prepareStackedBarData = (
   accountTypes: string[]
 ) =>
   banks.map((bank) => {
-    const row: Record<string, any> = { name: bank }; // Changed from bank -> name
+    const row: Record<string, any> = { name: bank };
     accountTypes.forEach((type) => {
       const sum = accounts
         .filter((a) => a.bankName === bank && a.accountType === type)
@@ -64,379 +46,6 @@ const prepareStackedBarData = (
     return row;
   });
 
-// --- PIE CHART ---
-function ModernPieChartBox({
-  title,
-  data,
-}: {
-  title: string;
-  data: { name: string; value: number }[];
-}) {
-  // Calculate total for percent in legend
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-
-  // Responsive ring sizing based on container size
-  function getRadii(containerWidth: number) {
-    if (containerWidth < 300) return { inner: 55, outer: 100 };
-    return { inner: 70, outer: 115 };
-  }
-
-  const [containerWidth, setContainerWidth] = useState(0);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleResize() {
-      if (boxRef.current) {
-        setContainerWidth(boxRef.current.offsetWidth);
-      }
-    }
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const { inner, outer } = getRadii(containerWidth);
-
-  // Custom Tooltip for modern look
-  function CustomTooltip({ active, payload }: any) {
-    if (active && payload && payload.length) {
-      const entry = payload[0];
-      const percent = total > 0 ? ((entry.value / total) * 100).toFixed(1) : "0";
-      return (
-        <Paper
-          elevation={6}
-          sx={{
-            px: 2,
-            py: 1,
-            bgcolor: "#fff",
-            borderRadius: 2,
-            minWidth: 120,
-            border: `2px solid ${entry.color}`,
-            boxShadow: "0 2px 12px rgba(0,0,0,0.10)",
-          }}
-        >
-          <Box display="flex" alignItems="center" mb={0.5}>
-            <Box
-              sx={{
-                width: 14,
-                height: 14,
-                bgcolor: entry.color,
-                borderRadius: "4px",
-                mr: 1,
-                flexShrink: 0,
-              }}
-            />
-            <Typography variant="subtitle2" fontWeight={700}>
-              {entry.name}
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            <b>${entry.value.toLocaleString()}</b> ({percent}%)
-          </Typography>
-        </Paper>
-      );
-    }
-    return null;
-  }
-
-  return (
-    <Paper
-      elevation={4}
-      sx={{
-        p: 3,
-        borderRadius: 3,
-        height: "100%",
-        minHeight: 420,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        bgcolor: "#ffffff",
-        boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
-      }}
-    >
-      <Typography variant="h6" gutterBottom align="center" sx={{ width: "100%" }}>
-        {title}
-      </Typography>
-      <Box
-        ref={boxRef}
-        sx={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "flex-start",
-        }}
-      >
-        <ResponsiveContainer width="75%" height={300} minWidth={200}>
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={inner}
-              outerRadius={outer}
-              paddingAngle={2}
-              isAnimationActive={false}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
-      </Box>
-      {/* Legend at the very bottom, left-aligned and centered horizontally */}
-      <Box
-        sx={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          mt: 2,
-        }}
-      >
-        <Box
-          sx={{
-            width: "100%",
-            maxWidth: 340,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-          }}
-        >
-          {data.map((entry, i) => (
-            <Box
-              key={entry.name}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: 1,
-                width: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  bgcolor: COLORS[i % COLORS.length],
-                  borderRadius: "4px",
-                  mr: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 500,
-                  color: "#222",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  flexGrow: 1,
-                }}
-              >
-                {entry.name}: ${entry.value.toFixed(0)}{" "}
-                ({total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0}%)
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-    </Paper>
-  );
-}
-
-// --- BAR CHART ---
-function ModernBarChartBox({
-  data,
-  accountTypes,
-}: {
-  data: any[];
-  accountTypes: string[];
-}) {
-  // Calculate max value for scaling
-  const allValues = data.flatMap(row => accountTypes.map(type => row[type] || 0));
-  const maxValue = Math.max(...allValues, 1);
-  const domainMax = Math.ceil(Math.max(maxValue * 1.1, maxValue + 100) / 100) * 100;
-
-  // Calculate totals for legend
-  const typeTotals: Record<string, number> = {};
-  data.forEach(row => {
-    accountTypes.forEach(type => {
-      typeTotals[type] = (typeTotals[type] || 0) + (row[type] || 0);
-    });
-  });
-  const total = Object.values(typeTotals).reduce((a, b) => a + b, 0);
-
-  // Modern tooltip
-  function CustomTooltip({ active, payload }: any) {
-    if (active && payload && payload.length) {
-      const entry = payload[0];
-      return (
-        <Paper
-          elevation={6}
-          sx={{
-            px: 2,
-            py: 1,
-            bgcolor: "#fff",
-            borderRadius: 2,
-            minWidth: 120,
-            border: `2px solid ${entry.color}`,
-            boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
-          }}
-        >
-          <Box display="flex" alignItems="center" mb={0.5}>
-            <Box
-              sx={{
-                width: 14,
-                height: 14,
-                bgcolor: entry.color,
-                borderRadius: "4px",
-                mr: 1,
-                flexShrink: 0,
-              }}
-            />
-            <Typography variant="subtitle2" fontWeight={700}>
-              {entry.name}
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            <b>${entry.value?.toLocaleString()}</b>
-          </Typography>
-        </Paper>
-      );
-    }
-    return null;
-  }
-
-  return (
-    <Paper
-      elevation={4}
-      sx={{
-        p: 3,
-        borderRadius: 4,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        minWidth: 0,
-      }}
-    >
-      <Typography variant="h6" textAlign="center" gutterBottom>
-        Balances by Bank & Type
-      </Typography>
-      <Box
-        sx={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start", // Left justify the chart
-        }}
-      >
-        <ResponsiveContainer width="100%" height={320} minWidth={250}>
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 20, right: 40, left: 10, bottom: 20 }}
-            barGap={10}
-          >
-            <XAxis
-              type="number"
-              tick={false} // <-- Hide X axis labels
-              axisLine={false}
-              tickLine={false}
-              domain={[0, domainMax]}
-              allowDataOverflow={false}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={60} // Reduce width so chart area is larger
-              tick={{ fontWeight: 550, fontSize: 14 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            {accountTypes.map((type, i) => (
-              <Bar
-                key={type}
-                dataKey={type}
-                fill={COLORS[i % COLORS.length]}
-                maxBarSize={22} // thinner bars
-                radius={[8, 8, 8, 8]}
-                isAnimationActive={false}
-                barSize={14} // thinner bars
-              >
-                <LabelList
-                  dataKey={type}
-                  position="right"
-                  formatter={(v: number) => (v > 0 ? `$${v.toLocaleString()}` : "")}
-                  style={{
-                    fill: "#222",
-                    fontWeight: 700,
-                    fontSize: 15,
-                    textShadow: "0 0 2px #fff",
-                  }}
-                />
-              </Bar>
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-        {/* Custom Legend below the chart, left-aligned and centered */}
-        <Box
-          sx={{
-            width: "100%",
-            maxWidth: 340,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            mt: 2,
-          }}
-        >
-          {accountTypes.map((type, i) => (
-            <Box
-              key={type}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: 1,
-                width: "100%",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
-                  bgcolor: COLORS[i % COLORS.length],
-                  borderRadius: "4px",
-                  mr: 1,
-                  flexShrink: 0,
-                }}
-              />
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 500,
-                  color: "#222",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  flexGrow: 1,
-                }}
-              >
-                {type}: ${typeTotals[type]?.toLocaleString() ?? 0}{" "}
-                ({total > 0 ? ((typeTotals[type] / total) * 100).toFixed(1) : 0}%)
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-    </Paper>
-  );
-}
 export default function DashboardPage() {
   const [accounts, setAccounts] = useState<CompiledBalance[]>([]);
   const [institutions, setInstitutions] = useState<Record<string, string>>({});
@@ -557,24 +166,28 @@ export default function DashboardPage() {
       </Typography>
 
       <Grid container spacing={2} justifyContent="center" sx={{ mb: 4 }}>
-        {/* Info Cards */}
-        {[{
-          label: "Total Balance",
-          value: `$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-          color: "primary"
-        }, {
-          label: "Banks Connected",
-          value: banks.length,
-          color: "secondary"
-        }, {
-          label: "Account Types",
-          value: accountTypes.length,
-          color: "info"
-        }, {
-          label: "Total Accounts",
-          value: accounts.length,
-          color: "success"
-        }].map((item, idx) => (
+        {[
+          {
+            label: "Total Balance",
+            value: `$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            color: "primary"
+          },
+          {
+            label: "Banks Connected",
+            value: banks.length,
+            color: "secondary"
+          },
+          {
+            label: "Account Types",
+            value: accountTypes.length,
+            color: "info"
+          },
+          {
+            label: "Total Accounts",
+            value: accounts.length,
+            color: "success"
+          }
+        ].map((item) => (
           <Grid item xs={12} sm={6} md={3} key={item.label}>
             <Card
               elevation={4}
@@ -582,27 +195,31 @@ export default function DashboardPage() {
                 borderRadius: 3,
                 bgcolor: "#ffffff",
                 boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
-                minHeight: 120,
+                minHeight: 100,
+                py: 1.5,
+                px: 2,
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
                 alignItems: "center",
-                p: 2,
               }}
             >
-              <CardContent sx={{ textAlign: "center", p: 0 }}>
-                <Typography variant="subtitle1" color="textSecondary" sx={{ mb: 1 }}>
-                  {item.label}
-                </Typography>
-                <Typography
-                  variant="h5"
-                  fontWeight="bold"
-                  color={item.color}
-                  sx={{ fontSize: 28 }}
-                >
-                  {item.value}
-                </Typography>
-              </CardContent>
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                color="textSecondary"
+                sx={{ fontSize: 16, mb: 0.25 }}
+              >
+                {item.label}
+              </Typography>
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                color={item.color}
+                sx={{ fontSize: 24 }}
+              >
+                {item.value}
+              </Typography>
             </Card>
           </Grid>
         ))}
@@ -616,11 +233,11 @@ export default function DashboardPage() {
               p: 3,
               borderRadius: 3,
               height: "100%",
-              minHeight: 420,
+              minHeight: 520,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              bgcolor: "#ffffff",
+              bgcolor: "rgb(214, 212, 212)",
               boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
             }}
           >
@@ -638,7 +255,7 @@ export default function DashboardPage() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              bgcolor: "#ffffff",
+              bgcolor: "rgb(214, 212, 212)",
               boxShadow: "0 2px 12px rgba(1,87,155,0.08)",
             }}
           >
