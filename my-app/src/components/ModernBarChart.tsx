@@ -32,6 +32,8 @@ export default function ModernBarChartBox({ data, accountTypes }: BarChartBoxPro
             borderRadius: 2,
             minWidth: 120,
             border: `2px solid ${entry.color}`,
+            maxWidth: 200,
+            wordWrap: "break-word",
           }}
         >
           <Box display="flex" alignItems="center" mb={0.5}>
@@ -44,7 +46,7 @@ export default function ModernBarChartBox({ data, accountTypes }: BarChartBoxPro
                 mr: 1,
               }}
             />
-            <Typography variant="subtitle2" fontWeight={700}>
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
               {entry.name}
             </Typography>
           </Box>
@@ -67,6 +69,7 @@ export default function ModernBarChartBox({ data, accountTypes }: BarChartBoxPro
         display: "flex",
         flexDirection: "column",
         alignItems: "stretch",
+        overflow: "hidden",
       }}
     >
       <Typography variant="h6" textAlign="center" sx={{ mb: 1 }}>
@@ -74,21 +77,25 @@ export default function ModernBarChartBox({ data, accountTypes }: BarChartBoxPro
       </Typography>
       <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
         <Box sx={{ flexGrow: 1, display: "flex", alignItems: "flex-end" }}>
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={360}>
             <BarChart
               data={data}
-              margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
-              barGap={20}
+              margin={{ top: 20, right: 20, left: 20, bottom: 10 }}
+              barGap={data.length <= 1 ? 0 : 20}
             >
               <XAxis
                 dataKey="name"
-                tick={{ fontWeight: 600, fontSize: 15 }}
+                tick={{
+                  fontWeight: 600,
+                  fontSize: 13,
+                  wordBreak: "break-word",
+                }}
                 axisLine={false}
                 tickLine={false}
                 interval={0}
-                angle={-35}
+                angle={-25}
                 textAnchor="end"
-                height={70}
+                height={60}
               />
               <Tooltip content={<CustomTooltip />} />
               {accountTypes.map((type, i) => (
@@ -96,38 +103,30 @@ export default function ModernBarChartBox({ data, accountTypes }: BarChartBoxPro
                   key={type}
                   dataKey={type}
                   fill={COLORS[i % COLORS.length]}
-                  maxBarSize={50}
+                  maxBarSize={40}
                   radius={[6, 6, 0, 0]}
                   isAnimationActive={false}
-                  barSize={40}
                 >
                   <LabelList
                     dataKey={type}
                     position="top"
-                    content={(props) => {
-                      const { x = 0, y = 0, value } = props;
+                    content={({ x = 0, y = 0, value }) => {
                       if (!value || Number(value) <= 0) return null;
-                      const offsetX = 15;
-                      const offsetY = -50;
-
-                      const labelX = typeof x === "number" ? x + offsetX : offsetX;
-                      const labelY = typeof y === "number" ? y + offsetY : offsetY;
+                      const label = `$${value.toLocaleString()}`;
+                      const fontSize = label.length > 10 ? 10 : 12;
 
                       return (
-                        <g>
-                          <text
-                            x={labelX}
-                            y={labelY}
-                            transform={`rotate(-90, ${labelX}, ${labelY})`}
-                            textAnchor="end"
-                            fill="#222"
-                            fontWeight={700}
-                            fontSize={14}
-                            style={{ textShadow: "0 0 2px #fff" }}
-                          >
-                            ${value.toLocaleString()}
-                          </text>
-                        </g>
+                        <text
+                          x={x}
+                          y={y - 10}
+                          fill="#222"
+                          fontWeight={700}
+                          fontSize={fontSize}
+                          textAnchor="middle"
+                          style={{ textShadow: "0 0 2px #fff" }}
+                        >
+                          {label}
+                        </text>
                       );
                     }}
                   />
